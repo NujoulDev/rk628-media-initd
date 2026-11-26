@@ -4,24 +4,41 @@ Configures RK628 video capture once after the first stable HDMI signal.
 Requires Raspberry Pi OS and the `rk628-rpi-dkms` driver package with its
 overlay configured.
 
-## Build dependencies
+## Install
+
+### From Release
+
+Download the `.deb` from the [latest Release](https://github.com/NujoulDev/rk628-media-initd/releases/latest). In the download directory, replace `PACKAGE.deb` with the downloaded filename and run:
 
 ```bash
-sudo apt install build-essential dpkg-dev debhelper
+sudo apt install ./PACKAGE.deb
 ```
 
-## Build
+### From source
+
+Install the build dependencies:
 
 ```bash
+sudo apt install git build-essential dpkg-dev debhelper
+```
+
+Clone the repository and build the package:
+
+```bash
+git clone https://github.com/NujoulDev/rk628-media-initd.git
+cd rk628-media-initd
 dpkg-buildpackage -us -uc -b
 ```
 
-The package is generated in the parent directory.
-
-## Install
+The build writes the package to the parent directory. Run this from the source directory:
 
 ```bash
-sudo apt install ./rk628-media-initd_0.1.0-1_all.deb
+sudo apt install "../rk628-media-initd_$(dpkg-parsechangelog -S Version)_all.deb"
+```
+
+### Check the service
+
+```bash
 systemctl status rk628-media-initd.service
 ```
 
