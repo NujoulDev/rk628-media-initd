@@ -1,0 +1,7 @@
+/artifacts/
+/debian/.debhelper/
+/debian/debhelper-build-stamp
+/debian/files
+/debian/*.debhelper
+/debian/*.substvars
+/debian/rk628-media-initd/

@@ -1,0 +1,2 @@
+media-initd.sh media-initd-pi4.sh media-initd-pi5.sh usr/libexec/rk628
+rk628-media-initd.service usr/lib/systemd/system

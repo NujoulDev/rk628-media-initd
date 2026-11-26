@@ -1,0 +1,5 @@
+rk628-media-initd (0.1.0-1) unstable; urgency=medium
+
+  * Initial package with automatic Raspberry Pi 4 and 5 detection.
+
+ -- Luo Jun <luojun@radxa.com>  Thu, 26 Nov 2026 10:30:00 +0800
