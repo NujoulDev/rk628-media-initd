@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
+    outputs:
+      artifact-id:
+        description: ID of the uploaded package artifact
+        value: ${{ jobs.build.outputs.artifact-id }}
 
 permissions:
   contents: read
@@ -19,6 +24,8 @@ jobs:
     runs-on: ubuntu-24.04
     container: debian:trixie
     timeout-minutes: 15
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
     defaults:
       run:
         shell: bash
@@ -50,6 +57,11 @@ jobs:
         run: |
           package=$(dpkg-parsechangelog -S Source)
           version=$(dpkg-parsechangelog -S Version)
+          if [[ $GITHUB_REF_TYPE == tag && $GITHUB_REF_NAME != "v$version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME must match Debian package version v$version"
+            exit 1
+          fi
+          source_commit=$(git -c safe.directory="$PWD" rev-parse --verify HEAD)
           {
             echo "package=$package"
             echo "version=$version"
@@ -58,7 +70,7 @@ jobs:
           {
             echo "Package: $package"
             echo "Version: $version"
-            echo "Source commit: $(git rev-parse HEAD)"
+            echo "Source commit: $source_commit"
           } | tee artifacts/BUILD-INFO.txt
 
       - name: Build Debian package
@@ -95,6 +107,7 @@ jobs:
           sha256sum ./*.deb ./*.changes ./*.buildinfo BUILD-INFO.txt build.log > SHA256SUMS
 
       - name: Upload package artifacts
+        id: upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.prepare.outputs.package }}_${{ steps.prepare.outputs.version }}

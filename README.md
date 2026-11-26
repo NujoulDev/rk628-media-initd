@@ -4,10 +4,15 @@ Configures RK628 video capture once after the first stable HDMI signal.
 Requires Raspberry Pi OS and the `rk628-rpi-dkms` driver package with its
 overlay configured.
 
-## Build
+## Build dependencies
 
 ```bash
 sudo apt install build-essential dpkg-dev debhelper
+```
+
+## Build
+
+```bash
 dpkg-buildpackage -us -uc -b
 ```
 
