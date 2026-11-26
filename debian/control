@@ -12,5 +12,5 @@ Architecture: all
 Depends: ${misc:Depends}, rk628-rpi-dkms, v4l-utils, mawk | awk
 Description: RK628 capture initialization for Raspberry Pi 4 and 5
  Detects the Raspberry Pi model, waits for a stable HDMI signal and
- configures the V4L2 capture path once. Provides an optional systemd
- service for initialization at boot.
+ configures the V4L2 capture path once. Provides a systemd service
+ enabled automatically for initialization at boot.
