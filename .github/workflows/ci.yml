@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: debian:trixie
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential dpkg-dev git ca-certificates shellcheck systemd
+
+      - name: Checkout source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install package build dependencies
+        run: apt-get build-dep -y --no-install-recommends ./
+
+      - name: Check scripts and service
+        run: |
+          for script in media-initd*.sh; do
+            sh -n "$script"
+          done
+          shellcheck --shell=sh media-initd*.sh
+          systemd-analyze verify rk628-media-initd.service
+
+      - name: Prepare build information
+        id: prepare
+        run: |
+          package=$(dpkg-parsechangelog -S Source)
+          version=$(dpkg-parsechangelog -S Version)
+          {
+            echo "package=$package"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+          mkdir -p artifacts
+          {
+            echo "Package: $package"
+            echo "Version: $version"
+            echo "Source commit: $(git rev-parse HEAD)"
+          } | tee artifacts/BUILD-INFO.txt
+
+      - name: Build Debian package
+        run: |
+          dpkg-buildpackage -us -uc -b 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      - name: Verify package contents
+        env:
+          PACKAGE: ${{ steps.prepare.outputs.package }}
+          VERSION: ${{ steps.prepare.outputs.version }}
+        run: |
+          deb="../${PACKAGE}_${VERSION}_all.deb"
+          test "$(dpkg-deb -f "$deb" Package)" = "$PACKAGE"
+          test "$(dpkg-deb -f "$deb" Version)" = "$VERSION"
+          test "$(dpkg-deb -f "$deb" Architecture)" = all
+          dpkg-deb --extract "$deb" "$RUNNER_TEMP/package"
+          for script in media-initd.sh media-initd-pi4.sh media-initd-pi5.sh; do
+            installed="$RUNNER_TEMP/package/usr/libexec/rk628/$script"
+            test -x "$installed"
+            cmp "$script" "$installed"
+          done
+          cmp rk628-media-initd.service \
+            "$RUNNER_TEMP/package/usr/lib/systemd/system/rk628-media-initd.service"
+          dpkg-deb --control "$deb" "$RUNNER_TEMP/control"
+          for script in postinst prerm postrm; do
+            test -x "$RUNNER_TEMP/control/$script"
+            sh -n "$RUNNER_TEMP/control/$script"
+          done
+
+      - name: Collect artifacts
+        run: |
+          cp ../*.deb ../*.changes ../*.buildinfo "$RUNNER_TEMP/build.log" artifacts/
+          cd artifacts || exit 1
+          sha256sum ./*.deb ./*.changes ./*.buildinfo BUILD-INFO.txt build.log > SHA256SUMS
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.prepare.outputs.package }}_${{ steps.prepare.outputs.version }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
+      - name: Record build result
+        if: ${{ always() && steps.prepare.outcome == 'success' }}
+        env:
+          RESULT: ${{ job.status }}
+        run: |
+          {
+            echo '### media-initd package build'
+            echo
+            cat artifacts/BUILD-INFO.txt
+            echo
+            echo "Result: $RESULT"
+          } >> "$GITHUB_STEP_SUMMARY"
